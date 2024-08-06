@@ -8,7 +8,7 @@ EntraID Premium P2 Lic
 
 # Policies🔏
 
-* Policy 1 - MFA For All *
+* Policy 1 - MFA For All
 
 
 
