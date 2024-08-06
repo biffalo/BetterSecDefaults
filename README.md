@@ -8,7 +8,17 @@ EntraID Premium P2 Lic
 
 # Policies🔏
 
-* Policy 1 - MFA For All
+**Policy 1 - MFA For All**
+
+**Policy 2 - OPTIONAL - Block Outside USA**
+
+**Policy 3 - OPTIONAL - Block MAC OS**
+
+**Policy 4 - OPTIONAL - Block Linux OS**
+
+**Policy 5 - BadRep IP Block**
+
+**Policy 6 - Sign-In Risk Block**
 
 
 
