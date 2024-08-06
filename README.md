@@ -13,7 +13,7 @@ A Powershell script for EntraID that creates a set of conditional access policie
 # Policies🔏
 **The following policies are created by this script**
 
-**Policy 1 - MFA For All**
+_ **Policy 1 - MFA For All** _
 
 Prompts you for trust location IP in CIDR format. Creates policy that requires MFA or hybrid join for any login coming from any network NOT in the "trusted" named location
 
