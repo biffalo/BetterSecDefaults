@@ -510,10 +510,10 @@ if ($null -ne $existingNamedLocation) {
     Write-Host "Named location 'BadRep1' already exists. Skipping creation." -BackgroundColor DarkBlue -ForegroundColor White
     Start-Sleep -Seconds 1
 } else {
-    $namedLocation = Get-MgIdentityConditionalAccessNamedLocation | Where-Object { $_.DisplayName -eq "BadRep1" } | select -ExpandProperty Id
     New-MgIdentityConditionalAccessNamedLocation -BodyParameter $bad1params
     Write-Host "Named location 'BadRep1' created successfully." -BackgroundColor DarkBlue -ForegroundColor White
     Start-Sleep -Seconds 1
+    $namedLocation = Get-MgIdentityConditionalAccessNamedLocation | Where-Object { $_.DisplayName -eq "BadRep1" } | select -ExpandProperty Id
 }
 
 ################!#############################################################
@@ -552,10 +552,10 @@ if ($null -ne $existingNamedLocation) {
     Write-Host "Named location 'BadRep2' already exists. Skipping creation." -BackgroundColor DarkBlue -ForegroundColor White
     Start-Sleep -Seconds 1
 } else {
-    $namedLocation2 = Get-MgIdentityConditionalAccessNamedLocation | Where-Object { $_.DisplayName -eq "BadRep2" } | select -ExpandProperty Id
     New-MgIdentityConditionalAccessNamedLocation -BodyParameter $bad2params
     Write-Host "Named location 'BadRep2' created successfully." -BackgroundColor DarkBlue -ForegroundColor White
     Start-Sleep -Seconds 1
+    $namedLocation2 = Get-MgIdentityConditionalAccessNamedLocation | Where-Object { $_.DisplayName -eq "BadRep2" } | select -ExpandProperty Id
 }
 
 ###################!##########################################################
@@ -594,10 +594,10 @@ if ($null -ne $existingNamedLocation) {
     Write-Host "Named location 'BadRep3' already exists. Skipping creation." -BackgroundColor DarkBlue -ForegroundColor White
     Start-Sleep -Seconds 1
 } else {
-    $namedLocation3 = Get-MgIdentityConditionalAccessNamedLocation | Where-Object { $_.DisplayName -eq "BadRep3" } | select -ExpandProperty Id
     New-MgIdentityConditionalAccessNamedLocation -BodyParameter $bad3params
     Write-Host "Named location 'BadRep3' created successfully." -BackgroundColor DarkBlue -ForegroundColor White
     Start-Sleep -Seconds 1
+    $namedLocation3 = Get-MgIdentityConditionalAccessNamedLocation | Where-Object { $_.DisplayName -eq "BadRep3" } | select -ExpandProperty Id
 }
 
 del C:\temp\ipv4-part*
@@ -698,7 +698,7 @@ else {
 $caps = Get-MgIdentityConditionalAccessPolicy | Select DisplayName, CreatedDateTime, State
 Write-Host "The Following Conditional Access Policies Were Created or Already Exist:" -BackgroundColor DarkBlue -ForegroundColor White
 $caps
-Start-Sleep -Seconds 5
+Start-Sleep -Seconds 2
 Write-Host "Now disconnecting from AzureAD/Graph" -BackgroundColor DarkBlue -ForegroundColor White
 
 #################################!#####################################################
