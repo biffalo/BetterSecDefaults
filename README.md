@@ -8,7 +8,7 @@ A Powershell script for EntraID that creates a set of conditional access policie
 
 🔵Security Defaults DISABLED (script will disable for you)
 
-🔵[Microsoft Graph Powershell Module] (https://learn.microsoft.com/en-us/powershell/microsoftgraph/installation?view=graph-powershell-1.0)
+🔵[Microsoft Graph Powershell Module](https://learn.microsoft.com/en-us/powershell/microsoftgraph/installation?view=graph-powershell-1.0)
 
 # Policies🔏
 ** The following policies are created by this script
