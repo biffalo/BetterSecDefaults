@@ -34,6 +34,7 @@ Optional policy. Blocks all logins from Linux devices. Excludes global admin rol
 Gets IP lists for known VPN providers and Tor exit nodes. Blocks login from IPs that match. Excludes global admin role.
 
 **🔵Policy 6 - Sign-In Risk Block**
+
 Creates sign in risk block policy (medium and high) and blocks risky sign-ins that match. Excludes global admin role.
 
 
