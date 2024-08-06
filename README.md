@@ -3,8 +3,11 @@
 A Powershell script for EntraID that creates a set of conditional access policies that will provide improved security over Microsoft's "Security Defaults".  This script is primarily for less mature orgs that are perhaps still using Microsofts "Security Defaults"  or only have very basic conditional access policies in place. These policies are certainly not bulletproof and good conditional access policies should be tailored to your org. 
 
 # Requirements📃
+
 🔵EntraID Premium P2 Lic (script will bail if not found)
+
 🔵Security Defaults DISABLED (script will disable for you)
+
 🔵Microsoft Graph Powershell Module [https://learn.microsoft.com/en-us/powershell/microsoftgraph/installation?view=graph-powershell-1.0]
 
 # Policies🔏
