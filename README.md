@@ -1,4 +1,4 @@
-![image](https://github.com/user-attachments/assets/5a6d8541-a543-4f83-900b-0988bf22ee54)# BetterSecDefaults🛡️ #
+# BetterSecDefaults🛡️ #
 
 An interactive Powershell script for EntraID that creates a set of conditional access policies that will provide improved security over Microsoft's "Security Defaults".  This script is primarily for less mature orgs that are perhaps still using Microsofts "Security Defaults"  or only have very basic conditional access policies in place. These policies are certainly not bulletproof and good conditional access policies should be tailored to your org. 
 
@@ -51,7 +51,7 @@ The script is designed to be interactive to guide you through policy creation wh
 
 🟢Prompt before creating any optional policy (Block macOS/linux/international sign-ins)
 
-![image](https://github.com/user-attachments/assets/f93948ea-154f-402c-9323-417b3f471ad6)
+![image](https://github.com/user-attachments/assets/5a6d8541-a543-4f83-900b-0988bf22ee54)
 
 
 
