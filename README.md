@@ -4,6 +4,8 @@ An interactive Powershell script for EntraID that creates a set of conditional a
 
 The script will check for EntraID P2 and exit if no lic found. Security defaults are also checked and disabled if enabled. 
 
+All policies and named locations are checked for their existence prior to creation.
+
 # Requirements📃
 
 🔵EntraID Premium P2 Lic (script will bail if not found)
@@ -52,6 +54,9 @@ The script is designed to be interactive to guide you through policy creation wh
 🟢Prompt before creating any optional policy (Block macOS/linux/international sign-ins)
 
 ![image](https://github.com/user-attachments/assets/8f8664f2-6149-4943-a4f3-378aa29e9565)
+
+![image](https://github.com/user-attachments/assets/fb59c4cc-086a-4703-b646-d139f09ca89f)
+
 
 
 
