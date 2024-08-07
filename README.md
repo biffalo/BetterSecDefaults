@@ -2,7 +2,7 @@
 
 An interactive Powershell script for EntraID that creates a set of conditional access policies that will provide improved security over Microsoft's "Security Defaults".  This script is primarily for less mature orgs that are perhaps still using Microsofts "Security Defaults"  or only have very basic conditional access policies in place. These policies are certainly not bulletproof and good conditional access policies should be tailored to your org. 
 
-The script will check for EntraID P2 and exit if no lic found. Security defaults are also checked and disabled if enabled. 
+For more security suggestions for Azure/365 check out [Easy Wins Email Defense](https://github.com/biffalo/easy-wins-email-defense).
 
 All policies and named locations are checked for their existence prior to creation.
 
