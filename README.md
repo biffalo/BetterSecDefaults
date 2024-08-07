@@ -12,9 +12,9 @@ All policies and named locations are checked for their existence prior to creati
 
 # Requirements📃
 
-🔵EntraID Premium P2 Lic (script will bail if not found)
+🔵EntraID Premium P2 Lic (script will exit if not found)
 
-🔵Security Defaults DISABLED (script will disable for you)
+🔵Security Defaults DISABLED (script will disable if enabled)
 
 🔵[Microsoft Graph Powershell Module](https://learn.microsoft.com/en-us/powershell/microsoftgraph/installation?view=graph-powershell-1.0)
 
@@ -23,7 +23,7 @@ All policies and named locations are checked for their existence prior to creati
 
 **🔵Policy 1 - MFA For All** 
 
-Prompts you for trust location IP in CIDR format. Creates policy that requires MFA or hybrid join for any login coming from any network NOT in the "trusted" named location
+Prompts you for trust location IP in CIDR format. Creates policy that requires MFA or hybrid join for any login coming from any network NOT in the "trusted" named location.
 
 **🔵Policy 2 - OPTIONAL - Block Outside USA**
 
@@ -46,6 +46,7 @@ Gets IP lists for known VPN providers and Tor exit nodes. Blocks login from IPs 
 Creates sign in risk block policy (medium and high) and blocks risky sign-ins that match. Excludes global admin role.
 
 # Usage📘
+[AZ-BetterSecDefaults.ps1](https://github.com/biffalo/BetterSecDefaults/blob/main/AZ-BetterSecDefaults.ps1)
 
 The script is designed to be interactive to guide you through policy creation where needed. Upon running the script you'll be prompted for the following information:
 
@@ -62,6 +63,8 @@ The script is designed to be interactive to guide you through policy creation wh
 ![image](https://github.com/user-attachments/assets/fb59c4cc-086a-4703-b646-d139f09ca89f)
 
 # Optional Checker Script🔍
+
+[AZ-BetterSecDefaults-Checker.ps1](https://github.com/biffalo/BetterSecDefaults/blob/main/AZ-BetterSecDefaults-Checker.ps1)
 
 Optionally you can use the checker script which checks for successful interactive sign-ins from outside USA/MacOS/Linux and displays them when found. For speed only the last 14 days of logs are checked. 
 
