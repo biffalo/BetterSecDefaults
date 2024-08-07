@@ -1,6 +1,8 @@
-# BetterSecDefaults🛡️ #
+![image](https://github.com/user-attachments/assets/5a6d8541-a543-4f83-900b-0988bf22ee54)# BetterSecDefaults🛡️ #
 
 An interactive Powershell script for EntraID that creates a set of conditional access policies that will provide improved security over Microsoft's "Security Defaults".  This script is primarily for less mature orgs that are perhaps still using Microsofts "Security Defaults"  or only have very basic conditional access policies in place. These policies are certainly not bulletproof and good conditional access policies should be tailored to your org. 
+
+The script will check for EntraID P2 and exit if no lic found. Security defaults are also checked and disabled if enabled. 
 
 # Requirements📃
 
@@ -36,6 +38,24 @@ Gets IP lists for known VPN providers and Tor exit nodes. Blocks login from IPs 
 **🔵Policy 6 - Sign-In Risk Block**
 
 Creates sign in risk block policy (medium and high) and blocks risky sign-ins that match. Excludes global admin role.
+
+# Usage📘
+
+The script is designed to be interactive to guide you through policy creation where needed. Upon running the script you'll be prompted for the following information:
+
+🟢Azure Tenant ID 
+
+🟢Azure Creds (auth to Azure)
+
+🟢WAN IP for trusted named location
+
+🟢Prompt before creating any optional policy (Block macOS/linux/international sign-ins)
+
+![image](https://github.com/user-attachments/assets/f93948ea-154f-402c-9323-417b3f471ad6)
+
+
+
+
 
 
 
