@@ -57,6 +57,13 @@ The script is designed to be interactive to guide you through policy creation wh
 
 ![image](https://github.com/user-attachments/assets/fb59c4cc-086a-4703-b646-d139f09ca89f)
 
+# Optional Checker Script🔍
+
+Optionally you can use the checker script which checks for successful interactive sign-ins from outside USA/MacOS/Linux and displays them when found. For speed only the last 14 days of logs are checked. 
+
+![image](https://github.com/user-attachments/assets/c6d3685c-d447-47b9-98e2-6b93b89ed699)
+
+
 
 
 
