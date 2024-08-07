@@ -6,6 +6,10 @@ The script will check for EntraID P2 and exit if no lic found. Security defaults
 
 All policies and named locations are checked for their existence prior to creation.
 
+[AZ-BetterSecDefaults.ps1](https://github.com/biffalo/BetterSecDefaults/blob/main/AZ-BetterSecDefaults.ps1)
+
+[AZ-BetterSecDefaults-Checker.ps1](https://github.com/biffalo/BetterSecDefaults/blob/main/AZ-BetterSecDefaults-Checker.ps1)
+
 # Requirements📃
 
 🔵EntraID Premium P2 Lic (script will bail if not found)
