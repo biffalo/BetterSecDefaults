@@ -2,7 +2,7 @@ Write-Host "CONNECTING TO AZURE/GRAPH" -BackgroundColor DarkBlue -ForegroundColo
 # Prompt for tenant ID
 $TenantId = Read-Host "Enter Azure TenantID"
 # Authenticate to Azure AD and Microsoft Graph
-Connect-MgGraph -TenantId $TenantId -Scopes "AuditLog.Read.All"
+Connect-MgGraph -TenantId $TenantId -Scopes "AuditLog.Read.All" -NoWelcome
 Start-Sleep -Seconds 2
 Write-Host "Checking for international logons. This will take up to 120 seconds..." -BackgroundColor DarkBlue -ForegroundColor White
 # Get the current date and the date 30 days ago

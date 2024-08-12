@@ -34,7 +34,7 @@ Write-Host "CONNECTING TO AZURE/GRAPH" -BackgroundColor DarkBlue -ForegroundColo
 Import-Module Microsoft.Graph.Reports
 Import-Module Microsoft.Graph.Identity.SignIns
 # Prompt for tenant ID
-$TenantId = Read-Host "Enter Azure TenantID"
+$TenantId = Read-Host "Enter Azure TenantID" -NoWelcome
 # Authenticate to Azure AD and Microsoft Graph
 Connect-MgGraph -TenantId $TenantId -Scopes "User.Read.All, Policy.ReadWrite.ConditionalAccess, Directory.Read.All, Policy.Read.All, RoleManagement.Read.All"
 Start-Sleep -Seconds 2
@@ -258,7 +258,7 @@ else {
 ####!###BLOCK MACOS CAP###########################################################################################################
 #####!############################################################################################################################
 ######!###########################################################################################################################
-Write-Host "OPTIONAL POLICY! Block Linux Sign Ins" -BackgroundColor DarkBlue -ForegroundColor White
+Write-Host "OPTIONAL POLICY! Block MacOS Sign Ins" -BackgroundColor DarkBlue -ForegroundColor White
 Write-Host "Only create this policy if you have checked for MacOS Logins" -BackgroundColor DarkYellow -ForegroundColor Black
 Start-Sleep -Seconds 1
 # Function to create a conditional access policy
