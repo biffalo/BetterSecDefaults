@@ -1,3 +1,13 @@
+#intro
+Write-Host "Checker script for BetterSecDefaults" -BackgroundColor DarkGreen -ForegroundColor White
+Write-Host "This script checks for information needed for optional policies as part of the BetterSecDefaults script." -BackgroundColor DarkBlue -ForegroundColor White
+Write-Host "You'll be shown any successful sign-ins for the last 14 days that match the following conditions:" -BackgroundColor DarkGreen -ForegroundColor White
+Start-Sleep -Seconds 1
+Write-Host "-Logins from outside USA" -BackgroundColor DarkYellow -ForegroundColor Black
+Write-Host "-Logins from macOS systems" -BackgroundColor DarkYellow -ForegroundColor Black
+Write-Host "-Logins from Linux systems" -BackgroundColor DarkYellow -ForegroundColor Black
+start-sleep -Seconds 1
+#connect to graph
 Write-Host "CONNECTING TO AZURE/GRAPH" -BackgroundColor DarkBlue -ForegroundColor White
 # Prompt for tenant ID
 $TenantId = Read-Host "Enter Azure TenantID"
