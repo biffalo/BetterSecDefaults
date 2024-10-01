@@ -33,10 +33,11 @@ Write-Host "CONNECTING TO AZURE/GRAPH" -BackgroundColor DarkBlue -ForegroundColo
 # Import Other Modules
 Import-Module Microsoft.Graph.Reports
 Import-Module Microsoft.Graph.Identity.SignIns
+Import-Module Microsoft.Graph.Authentication
 # Prompt for tenant ID
-$TenantId = Read-Host "Enter Azure TenantID" -NoWelcome
+$TenantId = Read-Host "Enter Azure TenantID"
 # Authenticate to Azure AD and Microsoft Graph
-Connect-MgGraph -TenantId $TenantId -Scopes "User.Read.All, Policy.ReadWrite.ConditionalAccess, Directory.Read.All, Policy.Read.All, RoleManagement.Read.All"
+Connect-MgGraph -TenantId $TenantId -Scopes "User.Read.All, Policy.ReadWrite.ConditionalAccess, Directory.Read.All, Policy.Read.All, RoleManagement.Read.All" -NoWelcome
 Start-Sleep -Seconds 2
 ##########!#######################################################################################################################
 ###########!######################################################################################################################
@@ -128,7 +129,7 @@ $conditionalAccessPolicy = @{
             includeApplications = @("all")
         }
         locations = @{
-            includeLocations = @("all")
+            includeLocations = @("All")  # Corrected here
             excludeLocations = @($existingNamedLocation.id)
         }
     }
