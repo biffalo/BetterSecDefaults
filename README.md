@@ -37,9 +37,9 @@ Optional policy. Blocks all logins from MacOS devices. Excludes global admin rol
 
 Optional policy. Blocks all logins from Linux devices. Excludes global admin role.
 
-**🔵Policy 5 - OPTIONAL - Block Linux OS**
+**🔵Policy 5 - Block Legacy Auth**
 
-Optional policy. Blocks all logins from Linux devices. Excludes global admin role.
+Blocks legacy auth unless it comes from a trusted location.
 
 **🔵Policy 6 - BadRep IP Block**
 
