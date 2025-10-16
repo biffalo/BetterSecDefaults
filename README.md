@@ -37,11 +37,15 @@ Optional policy. Blocks all logins from MacOS devices. Excludes global admin rol
 
 Optional policy. Blocks all logins from Linux devices. Excludes global admin role.
 
-**🔵Policy 5 - BadRep IP Block**
+**🔵Policy 5 - OPTIONAL - Block Linux OS**
+
+Optional policy. Blocks all logins from Linux devices. Excludes global admin role.
+
+**🔵Policy 6 - BadRep IP Block**
 
 Gets IP lists for known VPN providers and Tor exit nodes. Blocks login from IPs that match. Excludes global admin role.
 
-**🔵Policy 6 - Sign-In Risk Block**
+**🔵Policy 7 - Sign-In Risk Block**
 
 Creates sign in risk block policy (medium and high) and blocks risky sign-ins that match. Excludes global admin role.
 
@@ -66,7 +70,7 @@ The script is designed to be interactive to guide you through policy creation wh
 
 [AZ-BetterSecDefaults-Checker.ps1](https://github.com/biffalo/BetterSecDefaults/blob/main/AZ-BetterSecDefaults-Checker.ps1)
 
-Optionally you can use the checker script which checks for successful interactive sign-ins from outside USA/MacOS/Linux and displays them when found. For speed only the last 14 days of logs are checked. 
+Optionally you can use the checker script which checks for successful interactive sign-ins from outside USA/MacOS/Linux/Legacy Auth and displays them when found. For speed only the last 14 days of logs are checked. 
 
 ![image](https://github.com/user-attachments/assets/c6d3685c-d447-47b9-98e2-6b93b89ed699)
 
