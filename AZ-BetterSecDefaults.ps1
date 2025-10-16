@@ -20,6 +20,7 @@ Write-Host "MFA for All Apps with trusted location/hybrid joined devices exclude
 Write-Host "OPTIONAL! Block outside of USA (excludes global admin)" -BackgroundColor DarkGreen -ForegroundColor White
 Write-Host "OPTIONAL! Deny logon from device types Mac/Osx (excludes global admin)" -BackgroundColor DarkGreen -ForegroundColor White
 Write-Host "OPTIONAL! Deny logon from device types Linux (excludes global admin)" -BackgroundColor DarkGreen -ForegroundColor White
+Write-Host "Block Legacy Auth Except for Trusted Locations" -BackgroundColor DarkGreen -ForegroundColor White
 Write-Host "Blocks logins from known VPN Providers/TOR Exit Nodes (excludes global admin) " -BackgroundColor DarkGreen -ForegroundColor White
 Write-Host "Sign In Risk Policy (medium and high) (excludes global admin)" -BackgroundColor DarkGreen -ForegroundColor White
 Write-Host "Be sure to have TENANTID, GLOBAL ADMIN CREDS, and TRUSTED IPs IN CIDR FORMAT" -BackgroundColor DarkYellow -ForegroundColor Black
@@ -416,6 +417,51 @@ if ($selection -eq "1") {
     Write-Host "Exiting..."
 } else {
     Write-Host "Invalid option. Please run the script again and select a valid option."
+}
+#!################################################################################################################################
+#!################################################################################################################################
+#!######BLOCK LEGACY AUTH CAP######################################################################################################
+#!################################################################################################################################
+#!################################################################################################################################
+Write-Host "OPTIONAL POLICY! Block Legacy Authentication" -BackgroundColor DarkBlue -ForegroundColor White
+Write-Host "This policy blocks Exchange ActiveSync and other legacy clients. Only create if you have confirmed legacy auth usage!" -BackgroundColor DarkYellow -ForegroundColor Black
+Start-Sleep -Seconds 1
+
+$policyName = "Block Legacy Auth"
+
+# Define the Conditional Access policy body
+$params = @{
+    displayName = $policyName
+    state       = "enabled"
+    conditions  = @{
+        users = @{
+            includeUsers = @("all")
+        }
+        clientAppTypes = @("ExchangeActiveSync","Other")
+        applications   = @{
+            includeApplications = @("all")
+        }
+        locations = @{
+            includeLocations = @("All")
+            excludeLocations = @("AllTrusted")
+        }
+    }
+    grantControls = @{
+        operator        = "OR"
+        builtInControls = @("block")
+    }
+}
+
+# Check if the policy already exists
+$existingPolicy = Get-MgIdentityConditionalAccessPolicy | Where-Object { $_.DisplayName -eq $policyName }
+
+if ($null -ne $existingPolicy) {
+    Write-Host "Conditional Access Policy '$policyName' already exists. Skipping creation." -BackgroundColor DarkBlue -ForegroundColor White
+    Start-Sleep -Seconds 1
+} else {
+    New-MgIdentityConditionalAccessPolicy -BodyParameter $params
+    Write-Host "Conditional Access Policy '$policyName' created successfully." -BackgroundColor DarkBlue -ForegroundColor White
+    Start-Sleep -Seconds 1
 }
 
 ##########!##################################################################
