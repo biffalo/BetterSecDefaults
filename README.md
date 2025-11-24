@@ -18,36 +18,55 @@ All policies and named locations are checked for their existence prior to creati
 
 🔵[Microsoft Graph Powershell Module](https://learn.microsoft.com/en-us/powershell/microsoftgraph/installation?view=graph-powershell-1.0)
 
-# Policies🔏
+# Policies 🔏
 **The following policies are created by this script**
 
-**🔵Policy 1 - MFA For All** 
+## 🔵 Policy 1 - MFA For All
+Prompts you for trusted location IP in CIDR format. Creates policy that requires MFA or hybrid join for any login coming from any network NOT in the "trusted" named location. 
 
-Prompts you for trust location IP in CIDR format. Creates policy that requires MFA or hybrid join for any login coming from any network NOT in the "trusted" named location.
+**Best Practice:** This satisfies the best practice of enforcing multi-factor authentication for all users while providing a practical exception for corporate networks with compliant devices.
 
-**🔵Policy 2 - OPTIONAL - Block Outside USA**
+---
 
-Optional policy. Blocks logins to all apps from outside of the United States. Excludes global admin role.
+## 🔵 Policy 2 - Block Outside USA
+Blocks logins to all apps from outside of the United States. Excludes global admin role. 
 
-**🔵Policy 3 - OPTIONAL - Block MAC OS**
+**Best Practice:** This helps organizations satisfy compliance requirements for data sovereignty and geographic access restrictions, reducing the attack surface by limiting access to expected geographic regions.
 
-Optional policy. Blocks all logins from MacOS devices. Excludes global admin role.
+---
 
-**🔵Policy 4 - OPTIONAL - Block Linux OS**
+## 🔵 Policy 3 - Block MAC OS
+Blocks all logins from MacOS devices. Excludes global admin role. 
 
-Optional policy. Blocks all logins from Linux devices. Excludes global admin role.
+**Best Practice:** This enforces platform standardization best practices and helps organizations maintain a Windows-only environment for security, compliance, and management consistency.
 
-**🔵Policy 5 - Block Legacy Auth**
+---
 
-Blocks legacy auth unless it comes from a trusted location.
+## 🔵 Policy 4 - Block Linux OS
+Blocks all logins from Linux devices. Excludes global admin role. 
 
-**🔵Policy 6 - BadRep IP Block**
+**Best Practice:** This supports endpoint security best practices by preventing authentication from potentially unmanaged or non-compliant Linux systems that may not meet organizational security standards.
 
-Gets IP lists for known VPN providers and Tor exit nodes. Blocks login from IPs that match. Excludes global admin role.
+---
 
-**🔵Policy 7 - Sign-In Risk Block**
+## 🔵 Policy 5 - Block Legacy Auth
+Blocks legacy authentication protocols (Exchange ActiveSync and other legacy clients) unless originating from a trusted location. 
 
-Creates sign in risk block policy (medium and high) and blocks risky sign-ins that match. Excludes global admin role.
+**Best Practice:** This satisfies the critical best practice of eliminating legacy authentication methods that bypass modern security controls like MFA and are frequently exploited in attacks.
+
+---
+
+## 🔵 Policy 6 - BadRep IP Block
+Downloads and processes IP lists for known VPN providers (10,000+ IPs) and Tor exit nodes, creating named locations and blocking authentication attempts from these sources. Excludes global admin role. 
+
+**Best Practice:** This addresses the best practice of blocking anonymization services that are commonly used by threat actors to mask their true origin and evade geographic restrictions.
+
+---
+
+## 🔵 Policy 7 - Sign-In Risk Block
+Creates sign-in risk policy that blocks medium and high-risk sign-in attempts identified by Azure AD Identity Protection. Excludes global admin role. 
+
+**Best Practice:** This implements the best practice of risk-based conditional access, leveraging Microsoft's threat intelligence to automatically block suspicious authentication attempts in real-time.
 
 # Usage📘
 [AZ-BetterSecDefaults.ps1](https://github.com/biffalo/BetterSecDefaults/blob/main/AZ-BetterSecDefaults.ps1)
@@ -60,7 +79,7 @@ The script is designed to be interactive to guide you through policy creation wh
 
 🟢WAN IP for trusted named location
 
-🟢Prompt before creating any optional policy (Block macOS/linux/international sign-ins)
+
 
 ![image](https://github.com/user-attachments/assets/8f8664f2-6149-4943-a4f3-378aa29e9565)
 
