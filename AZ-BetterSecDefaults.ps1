@@ -15,16 +15,16 @@ Write-Host " |  _ \ / _ \ __| __/ _ \ '__\___ \ / _ \/ __| | | |/ _ \ |_ / _` | 
 Write-Host " | |_) |  __/ |_| ||  __/ |   ___) |  __/ (__| |_| |  __/  _| (_| | |_| | | |_\__ \" -BackgroundColor DarkBlue -ForegroundColor Black
 Write-Host " |____/ \___|\__|\__\___|_|  |____/ \___|\___|____/ \___|_|  \__,_|\__,_|_|\__|___/" -BackgroundColor DarkBlue -ForegroundColor Black
 Write-Host "                                                                                   " -BackgroundColor DarkBlue -ForegroundColor Black
-Write-Host "This script creates up to 6 conditional access policies." -BackgroundColor DarkBlue -ForegroundColor White
+Write-Host "This script creates 7 conditional access policies." -BackgroundColor DarkBlue -ForegroundColor White
 Write-Host "MFA for All Apps with trusted location/hybrid joined devices excluded" -BackgroundColor DarkGreen -ForegroundColor White
-Write-Host "OPTIONAL! Block outside of USA (excludes global admin)" -BackgroundColor DarkGreen -ForegroundColor White
-Write-Host "OPTIONAL! Deny logon from device types Mac/Osx (excludes global admin)" -BackgroundColor DarkGreen -ForegroundColor White
-Write-Host "OPTIONAL! Deny logon from device types Linux (excludes global admin)" -BackgroundColor DarkGreen -ForegroundColor White
+Write-Host "Block outside of USA (excludes global admin)" -BackgroundColor DarkGreen -ForegroundColor White
+Write-Host "Deny logon from device types Mac/Osx (excludes global admin)" -BackgroundColor DarkGreen -ForegroundColor White
+Write-Host "Deny logon from device types Linux (excludes global admin)" -BackgroundColor DarkGreen -ForegroundColor White
 Write-Host "Block Legacy Auth Except for Trusted Locations" -BackgroundColor DarkGreen -ForegroundColor White
 Write-Host "Blocks logins from known VPN Providers/TOR Exit Nodes (excludes global admin) " -BackgroundColor DarkGreen -ForegroundColor White
-Write-Host "Sign In Risk Policy (medium and high) (excludes global admin)" -BackgroundColor DarkGreen -ForegroundColor White
+Write-Host "Sign In Risk Policy (medium and high) (excludes global admin)(excludes trust locations)" -BackgroundColor DarkGreen -ForegroundColor White
 Write-Host "Be sure to have TENANTID, GLOBAL ADMIN CREDS, and TRUSTED IPs IN CIDR FORMAT" -BackgroundColor DarkYellow -ForegroundColor Black
-Start-Sleep -Seconds 3
+
 ############!#####################################################################################################################
 ##########!#######################################################################################################################
 ###########!Connect##################################################################################################
@@ -39,7 +39,6 @@ Import-Module Microsoft.Graph.Authentication
 $TenantId = Read-Host "Enter Azure TenantID"
 # Authenticate to Azure AD and Microsoft Graph
 Connect-MgGraph -TenantId $TenantId -Scopes "User.Read.All, Policy.ReadWrite.ConditionalAccess, Directory.Read.All, Policy.Read.All, RoleManagement.Read.All" -NoWelcome
-Start-Sleep -Seconds 2
 ##########!#######################################################################################################################
 ###########!######################################################################################################################
 ##########!#Lic Check##################################################################################################
@@ -53,11 +52,83 @@ $p2License = $licenses.value | Where-Object { $_.skuPartNumber -eq "AAD_PREMIUM_
 
 if (-not $p2License) {
     Write-Host "You have the wrong license type. AzureAD/Entra P2 license required. Exiting script." -BackgroundColor DarkRed -ForegroundColor White
-    Start-Sleep -Seconds 1
     exit
 } else {
     Write-Host "AzureAD/Entra P2 license is present! Continuing..." -BackgroundColor DarkGreen -ForegroundColor White
-    Start-Sleep -Seconds 1
+}
+
+Write-Host "Caching existing Conditional Access policies and Global Administrator role..." -BackgroundColor DarkBlue -ForegroundColor White
+$ExistingCAPolicies = Get-MgIdentityConditionalAccessPolicy -All
+$GlobalAdminRoleIds = Get-MgRoleManagementDirectoryRoleDefinition -All |
+    Where-Object { $_.DisplayName -eq "Global Administrator" } |
+    Select-Object -ExpandProperty Id
+
+function Refresh-ConditionalAccessPolicyCache {
+    $script:ExistingCAPolicies = Get-MgIdentityConditionalAccessPolicy -All
+}
+
+function Wait-NamedLocationAvailable {
+    param(
+        [Parameter(Mandatory)]
+        [string]$NamedLocationId,
+
+        [int]$MaxAttempts = 12,
+
+        [int]$DelaySeconds = 5
+    )
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            Get-MgIdentityConditionalAccessNamedLocation -NamedLocationId $NamedLocationId -ErrorAction Stop | Out-Null
+            return $true
+        }
+        catch {
+            if ($attempt -eq $MaxAttempts) {
+                return $false
+            }
+
+            Start-Sleep -Seconds $DelaySeconds
+        }
+    }
+}
+
+function Wait-ConditionalAccessPolicyAvailable {
+    param(
+        [string]$PolicyId,
+
+        [Parameter(Mandatory)]
+        [string]$DisplayName,
+
+        [int]$MaxAttempts = 12,
+
+        [int]$DelaySeconds = 5
+    )
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            if (-not [string]::IsNullOrWhiteSpace($PolicyId)) {
+                $policy = Get-MgIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $PolicyId -ErrorAction Stop
+            }
+            else {
+                $policy = Get-MgIdentityConditionalAccessPolicy -All -ErrorAction Stop |
+                    Where-Object { $_.DisplayName -eq $DisplayName } |
+                    Select-Object -First 1
+            }
+
+            if ($policy) {
+                return $true
+            }
+        }
+        catch {
+            if ($attempt -eq $MaxAttempts) {
+                return $false
+            }
+        }
+
+        Start-Sleep -Seconds $DelaySeconds
+    }
+
+    return $false
 }
 
 ##########!#######################################################################################################################
@@ -71,7 +142,6 @@ $getSD = Get-MgPolicyIdentitySecurityDefaultEnforcementPolicy
 
 if ($getSD.IsEnabled -eq $true) {
     Write-Host "'Security Defaults' is enabled. Disabling it now...." -BackgroundColor DarkRed -ForegroundColor White
-    Start-Sleep -Seconds 1
     $params = @{
         IsEnabled = $false
     }
@@ -80,9 +150,7 @@ if ($getSD.IsEnabled -eq $true) {
 } 
 else {
     Write-Host "'Security Defaults' is disabled. Continuing..." -BackgroundColor DarkGreen -ForegroundColor White
-    Start-Sleep -Seconds 1
 }
-
 #!################################################################################################################################
 ##!###############################################################################################################################
 ###!####MFA FOR ALL CAP###########################################################################################################
@@ -90,84 +158,120 @@ else {
 #####!############################################################################################################################
 Write-Host "POLICY - MFA FOR ALL" -BackgroundColor DarkBlue -ForegroundColor White
 
-# Get WAN IP from User
-$ipRanges = Read-Host "Enter Trusted Location IP Address in CIDR format."
-
-# Check if the named location "Trusted" already exists
+# Named Location Name
 $locationName = "Trusted"
-$existingNamedLocation = Get-MgIdentityConditionalAccessNamedLocation | Where-Object { $_.DisplayName -eq $locationName }
+
+# Helper: Get named location reliably (server-side filter + explicit select)
+function Get-TrustedNamedLocation {
+    param([string]$Name)
+
+    $loc = Get-MgIdentityConditionalAccessNamedLocation `
+        -Filter "displayName eq '$Name'" `
+        -Property "id,displayName" `
+        -All |
+        Select-Object -First 1
+
+    # Some SDK shapes place fields in AdditionalProperties
+    if ($loc -and [string]::IsNullOrWhiteSpace($loc.Id) -and $loc.AdditionalProperties) {
+        $maybeId = $loc.AdditionalProperties["id"]
+        if (-not [string]::IsNullOrWhiteSpace($maybeId)) {
+            $loc | Add-Member -NotePropertyName Id -NotePropertyValue $maybeId -Force
+        }
+    }
+
+    return $loc
+}
+
+# Check if the named location already exists
+$existingNamedLocation = Get-TrustedNamedLocation -Name $locationName
 
 if ($null -ne $existingNamedLocation) {
-    Write-Host "Named location 'Trusted' already exists. Skipping creation." -BackgroundColor DarkBlue -ForegroundColor White
-    Start-Sleep -Seconds 1
-} else {
-    # Define the named location policy
+    Write-Host "Named location 'Trusted' already exists with ID: $($existingNamedLocation.Id)" -BackgroundColor DarkBlue -ForegroundColor White
+
+    # Verify the location is retrievable
+    try {
+        Get-MgIdentityConditionalAccessNamedLocation -NamedLocationId $existingNamedLocation.Id -ErrorAction Stop | Out-Null
+        Write-Host "Verified named location 'Trusted' is accessible." -BackgroundColor DarkGreen -ForegroundColor White
+    }
+    catch {
+        Write-Host "WARNING: Named location exists but cannot be retrieved. Recreating..." -BackgroundColor DarkYellow -ForegroundColor Black
+        $existingNamedLocation = $null
+    }
+}
+
+if ($null -eq $existingNamedLocation) {
+    # Get WAN IP from User only when the trusted location must be created
+    $ipRanges = Read-Host "Enter Trusted Location IP Address in CIDR format."
+
+    # Define the named location
     $namedLocationParams = @{
         "@odata.type" = "#microsoft.graph.ipNamedLocation"
-        displayName = "Trusted"
-        isTrusted = $true
-        ipRanges = @(@{ 
-            "@odata.type" = "#microsoft.graph.iPv4CidrRange"
-            cidrAddress = $ipRanges 
-        })
-    }
-
-    # Create the named location policy
-    $existingNamedLocation = New-MgIdentityConditionalAccessNamedLocation -BodyParameter $namedLocationParams
-    Write-Host "Named location 'Trusted' created successfully with ID: $($existingNamedLocation.Id)" -BackgroundColor DarkGreen -ForegroundColor White
-    Start-Sleep -Seconds 2
-}
-
-# Verify we have a valid ID
-if ([string]::IsNullOrWhiteSpace($existingNamedLocation.Id)) {
-    Write-Host "ERROR: Failed to get Named Location ID. Cannot create policy." -BackgroundColor DarkRed -ForegroundColor White
-    Write-Host "Attempting to retrieve existing location..." -BackgroundColor DarkYellow -ForegroundColor Black
-    $existingNamedLocation = Get-MgIdentityConditionalAccessNamedLocation | Where-Object { $_.DisplayName -eq $locationName }
-    if ($null -eq $existingNamedLocation) {
-        Write-Host "CRITICAL: Cannot find Trusted named location. Skipping MFA policy creation." -BackgroundColor DarkRed -ForegroundColor White
-        Start-Sleep -Seconds 2
-    }
-}
-
-# Only create policy if we have a valid named location ID
-if ($null -ne $existingNamedLocation -and -not [string]::IsNullOrWhiteSpace($existingNamedLocation.Id)) {
-    # Check if the Conditional Access Policy "MFA for All" already exists
-    $existingPolicies = Get-MgIdentityConditionalAccessPolicy | Where-Object { $_.DisplayName -eq "MFA for All" }
-
-    if ($null -ne $existingPolicies) {
-        Write-Host "Conditional Access Policy 'MFA for All' already exists. Skipping creation." -BackgroundColor DarkBlue -ForegroundColor White
-        Start-Sleep -Seconds 1
-    } 
-    else {
-        # Create the Conditional Access Policy
-        $conditionalAccessPolicy = @{
-            displayName = "MFA for All"
-            state = "enabled"
-            conditions = @{
-                users = @{
-                    includeUsers = @("all")
-                }
-                applications = @{
-                    includeApplications = @("all")
-                }
-                locations = @{
-                    includeLocations = @("All")
-                    excludeLocations = @($existingNamedLocation.Id)
-                }
+        displayName  = "Trusted"
+        isTrusted    = $true
+        ipRanges     = @(
+            @{
+                "@odata.type" = "#microsoft.graph.iPv4CidrRange"
+                cidrAddress  = $ipRanges
             }
-            grantControls = @{
-                operator = "OR"
-                builtInControls = @("mfa", "domainJoinedDevice")
+        )
+    }
+
+    # Create the named location
+    try {
+        New-MgIdentityConditionalAccessNamedLocation -BodyParameter $namedLocationParams -ErrorAction Stop | Out-Null
+        Write-Host "Named location 'Trusted' created successfully." -BackgroundColor DarkGreen -ForegroundColor White
+    }
+    catch {
+        Write-Host "ERROR: Failed to create named location: $($_.Exception.Message)" -BackgroundColor DarkRed -ForegroundColor White
+    }
+}
+
+
+# Check if Conditional Access Policy already exists
+$existingPolicies = $ExistingCAPolicies |
+    Where-Object { $_.DisplayName -eq "MFA for All" }
+
+if ($null -ne $existingPolicies) {
+    Write-Host "Conditional Access Policy 'MFA for All' already exists. Skipping creation." -BackgroundColor DarkBlue -ForegroundColor White
+}
+else {
+
+    # Define Conditional Access Policy - excludes ALL trusted named locations
+    $conditionalAccessPolicy = @{
+        displayName = "MFA for All"
+        state       = "enabled"
+        conditions  = @{
+            users        = @{
+                includeUsers = @("all")
+            }
+            applications = @{
+                includeApplications = @("all")
+            }
+            locations    = @{
+                includeLocations = @("All")
+                excludeLocations = @("AllTrusted")
             }
         }
+        grantControls = @{
+            operator        = "OR"
+            builtInControls = @("mfa", "domainJoinedDevice")
+        }
+    }
 
-        # Create using the cmdlet instead of Invoke-MgGraphRequest
-        New-MgIdentityConditionalAccessPolicy -BodyParameter $conditionalAccessPolicy
-        Write-Host "Conditional Access Policy 'MFA for All' created successfully." -BackgroundColor DarkGreen -ForegroundColor White
-        Start-Sleep -Seconds 1
+    try {
+        $createdMfaPolicy = New-MgIdentityConditionalAccessPolicy -BodyParameter $conditionalAccessPolicy -ErrorAction Stop
+        if (Wait-ConditionalAccessPolicyAvailable -PolicyId $createdMfaPolicy.Id -DisplayName "MFA for All") {
+            Write-Host "Conditional Access Policy 'MFA for All' created successfully." -BackgroundColor DarkGreen -ForegroundColor White
+        }
+        else {
+            Write-Host "WARNING: Graph accepted 'MFA for All', but it is not visible in policy lookups yet." -BackgroundColor DarkYellow -ForegroundColor Black
+        }
+        Refresh-ConditionalAccessPolicyCache
+    }
+    catch {
+        Write-Host "ERROR: Failed to create Conditional Access Policy: $($_.Exception.Message)" -BackgroundColor DarkRed -ForegroundColor White
     }
 }
-
 #!################################################################################################################################
 #!################################################################################################################################
 ##!##### BLOCK OUTSIDE USA CAP — AUTO MODE ########################################################################################
@@ -175,7 +279,6 @@ if ($null -ne $existingNamedLocation -and -not [string]::IsNullOrWhiteSpace($exi
 ####!#############################################################################################################################
 
 Write-Host "AUTO: Checking Block Outside USA policy…" -BackgroundColor DarkBlue -ForegroundColor White
-Start-Sleep -Seconds 1
 
 # ======================================================================
 # Variables
@@ -198,8 +301,9 @@ $countryCodes = @(
 # ======================================================================
 # Named Location — Check / Create
 # ======================================================================
-$existingLocation = Get-MgIdentityConditionalAccessNamedLocation |
-                    Where-Object { $_.DisplayName -eq $locationName }
+$existingLocation = Get-MgIdentityConditionalAccessNamedLocation -All |
+                    Where-Object { $_.DisplayName -eq $locationName } |
+                    Select-Object -First 1
 
 if (-not $existingLocation) {
     Write-Host "Creating named location '$locationName'…" -BackgroundColor DarkBlue -ForegroundColor White
@@ -211,34 +315,37 @@ if (-not $existingLocation) {
         IncludeUnknownCountriesAndRegions    = $false
     }
 
-    $existingLocation = New-MgIdentityConditionalAccessNamedLocation -BodyParameter $params
-    
-    Write-Host "Named location created with ID: $($existingLocation.Id)" -BackgroundColor DarkGreen -ForegroundColor White
-    Start-Sleep -Seconds 2
+    try {
+        $existingLocation = New-MgIdentityConditionalAccessNamedLocation -BodyParameter $params -ErrorAction Stop
+        Write-Host "Named location created with ID: $($existingLocation.Id)" -BackgroundColor DarkGreen -ForegroundColor White
+    }
+    catch {
+        Write-Host "ERROR: Failed to create named location '$locationName': $($_.Exception.Message)" -BackgroundColor DarkRed -ForegroundColor White
+        $existingLocation = $null
+    }
 }
 else {
     Write-Host "Named location '$locationName' already exists with ID: $($existingLocation.Id)" -BackgroundColor DarkGreen -ForegroundColor White
-    Start-Sleep -Seconds 1
 }
 
 # ======================================================================
 # Conditional Access Policy — Check / Create
 # ======================================================================
-$existingPolicy = Get-MgIdentityConditionalAccessPolicy |
+$existingPolicy = $ExistingCAPolicies |
                   Where-Object { $_.DisplayName -eq $policyName }
 
 if (-not $existingPolicy) {
     # Verify we have a valid ID
     if ([string]::IsNullOrWhiteSpace($existingLocation.Id)) {
         Write-Host "ERROR: Named Location ID is empty. Cannot create policy." -BackgroundColor DarkRed -ForegroundColor White
-        Start-Sleep -Seconds 2
+    }
+    elseif (-not (Wait-NamedLocationAvailable -NamedLocationId $existingLocation.Id)) {
+        Write-Host "ERROR: Named location '$locationName' was created, but Graph is not returning it yet. Skipping '$policyName' for this run." -BackgroundColor DarkRed -ForegroundColor White
     }
     else {
         Write-Host "Creating Conditional Access policy '$policyName'…" -BackgroundColor DarkBlue -ForegroundColor White
 
-        $adminRolesIds = Get-MgRoleManagementDirectoryRoleDefinition |
-                         Where-Object { $_.DisplayName -like "*Global Administrator*" } |
-                         Select-Object -ExpandProperty Id
+        $adminRolesIds = $GlobalAdminRoleIds
 
         $policy = @{
             displayName = $policyName
@@ -262,19 +369,50 @@ if (-not $existingPolicy) {
             }
         }
 
-        New-MgIdentityConditionalAccessPolicy -BodyParameter $policy
+        $policyCreated = $false
+        $maxPolicyCreateAttempts = 18
+        $policyCreateDelaySeconds = 10
 
-        Write-Host "Conditional Access policy created." -BackgroundColor DarkGreen -ForegroundColor White
-        Start-Sleep -Seconds 1
+        for ($attempt = 1; $attempt -le $maxPolicyCreateAttempts; $attempt++) {
+            try {
+                $createdOutsidePolicy = New-MgIdentityConditionalAccessPolicy -BodyParameter $policy -ErrorAction Stop
+
+                if (Wait-ConditionalAccessPolicyAvailable -PolicyId $createdOutsidePolicy.Id -DisplayName $policyName) {
+                    Write-Host "Conditional Access policy '$policyName' created successfully." -BackgroundColor DarkGreen -ForegroundColor White
+                }
+                else {
+                    Write-Host "WARNING: Graph accepted '$policyName', but it is not visible in policy lookups yet." -BackgroundColor DarkYellow -ForegroundColor Black
+                }
+
+                Refresh-ConditionalAccessPolicyCache
+                $policyCreated = $true
+                break
+            }
+            catch {
+                $message = $_.Exception.Message
+                $namedLocationNotReady = $message -match "1040|NamedLocation.*does not exist"
+
+                if ($namedLocationNotReady -and $attempt -lt $maxPolicyCreateAttempts) {
+                    Write-Host ("Named location '$locationName' is not ready for policy validation yet. Retrying in {0} seconds ({1}/{2})..." -f $policyCreateDelaySeconds, $attempt, $maxPolicyCreateAttempts) -BackgroundColor DarkYellow -ForegroundColor Black
+                    Start-Sleep -Seconds $policyCreateDelaySeconds
+                    continue
+                }
+
+                Write-Host "ERROR: Failed to create Conditional Access policy '$policyName': $message" -BackgroundColor DarkRed -ForegroundColor White
+                break
+            }
+        }
+
+        if (-not $policyCreated) {
+            Write-Host "Conditional Access policy '$policyName' was not created in this run." -BackgroundColor DarkRed -ForegroundColor White
+        }
     }
 }
 else {
     Write-Host "Conditional Access policy '$policyName' already exists. Skipping." -BackgroundColor DarkGreen -ForegroundColor White
-    Start-Sleep -Seconds 1
 }
 
 Write-Host "Block Outside USA — Completed" -BackgroundColor DarkBlue -ForegroundColor White
-Start-Sleep -Seconds 1
 
 
 #######!##########################################################################################################################
@@ -284,19 +422,17 @@ Start-Sleep -Seconds 1
 ######!###########################################################################################################################
 
 Write-Host "AUTO: Checking Block MacOS Sign-Ins policy…" -BackgroundColor DarkBlue -ForegroundColor White
-Start-Sleep -Seconds 1
 
 $policyName = "Block MAC OS"
 
 # ======================================================================
 # Check for existing policy
 # ======================================================================
-$existingPolicy = Get-MgIdentityConditionalAccessPolicy |
+$existingPolicy = $ExistingCAPolicies |
                   Where-Object { $_.DisplayName -eq $policyName }
 
 if ($existingPolicy) {
     Write-Host "Conditional Access policy '$policyName' already exists. Skipping." -BackgroundColor DarkGreen -ForegroundColor White
-    Start-Sleep -Seconds 1
 }
 else {
     # ======================================================================
@@ -305,9 +441,7 @@ else {
 
     Write-Host "Creating Conditional Access policy '$policyName'…" -BackgroundColor DarkBlue -ForegroundColor White
 
-    $adminRolesIds = Get-MgRoleManagementDirectoryRoleDefinition |
-                     Where-Object { $_.DisplayName -like "*Global Administrator*" } |
-                     Select-Object -ExpandProperty Id
+    $adminRolesIds = $GlobalAdminRoleIds
 
     $conditions = @{
         users = @{
@@ -321,6 +455,10 @@ else {
         applications = @{
             includeApplications = @("All")
         }
+        locations = @{
+            includeLocations = @("All")
+            excludeLocations = @("AllTrusted")
+        }
     }
 
     $grantControls = @{
@@ -329,18 +467,21 @@ else {
     }
 
     $policy = @{
-        displayName  = $policyName
-        state        = "enabled"
-        conditions   = $conditions
+        displayName   = $policyName
+        state         = "enabled"
+        conditions    = $conditions
         grantControls = $grantControls
     }
 
-    New-MgIdentityConditionalAccessPolicy -BodyParameter $policy
-
-    Write-Host "Conditional Access policy '$policyName' created successfully." -BackgroundColor DarkGreen -ForegroundColor White
-    Start-Sleep -Seconds 1
+    try {
+        New-MgIdentityConditionalAccessPolicy -BodyParameter $policy -ErrorAction Stop | Out-Null
+        Write-Host "Conditional Access policy '$policyName' created successfully." -BackgroundColor DarkGreen -ForegroundColor White
+        Refresh-ConditionalAccessPolicyCache
+    }
+    catch {
+        Write-Host "ERROR: Failed to create Conditional Access policy '$policyName': $($_.Exception.Message)" -BackgroundColor DarkRed -ForegroundColor White
+    }
 }
-
 
 #!################################################################################################################################
 #!################################################################################################################################
@@ -349,19 +490,17 @@ else {
 #!################################################################################################################################
 
 Write-Host "AUTO: Checking Block Linux Sign-Ins policy…" -BackgroundColor DarkBlue -ForegroundColor White
-Start-Sleep -Seconds 1
 
 $policyName = "Block Linux OS"
 
 # ======================================================================
 # Check for existing policy
 # ======================================================================
-$existingPolicy = Get-MgIdentityConditionalAccessPolicy |
+$existingPolicy = $ExistingCAPolicies |
                   Where-Object { $_.DisplayName -eq $policyName }
 
 if ($existingPolicy) {
     Write-Host "Conditional Access policy '$policyName' already exists. Skipping." -BackgroundColor DarkGreen -ForegroundColor White
-    Start-Sleep -Seconds 1
 }
 else {
     # ======================================================================
@@ -370,9 +509,7 @@ else {
 
     Write-Host "Creating Conditional Access policy '$policyName'…" -BackgroundColor DarkBlue -ForegroundColor White
 
-    $adminRolesIds = Get-MgRoleManagementDirectoryRoleDefinition |
-                     Where-Object { $_.DisplayName -like "*Global Administrator*" } |
-                     Select-Object -ExpandProperty Id
+    $adminRolesIds = $GlobalAdminRoleIds
 
     $params = @{
         displayName = $policyName
@@ -388,6 +525,10 @@ else {
             platforms = @{
                 includePlatforms = @("Linux")
             }
+            locations = @{
+                includeLocations = @("All")
+                excludeLocations = @("AllTrusted")
+            }
         }
         grantControls = @{
             operator        = "OR"
@@ -395,20 +536,22 @@ else {
         }
     }
 
-    New-MgIdentityConditionalAccessPolicy -BodyParameter $params
-
-    Write-Host "Conditional Access policy '$policyName' created successfully." -BackgroundColor DarkGreen -ForegroundColor White
-    Start-Sleep -Seconds 1
+    try {
+        New-MgIdentityConditionalAccessPolicy -BodyParameter $params -ErrorAction Stop | Out-Null
+        Write-Host "Conditional Access policy '$policyName' created successfully." -BackgroundColor DarkGreen -ForegroundColor White
+        Refresh-ConditionalAccessPolicyCache
+    }
+    catch {
+        Write-Host "ERROR: Failed to create Conditional Access policy '$policyName': $($_.Exception.Message)" -BackgroundColor DarkRed -ForegroundColor White
+    }
 }
-
 #!################################################################################################################################
 #!################################################################################################################################
 #!######BLOCK LEGACY AUTH CAP######################################################################################################
 #!################################################################################################################################
 #!################################################################################################################################
-Write-Host "OPTIONAL POLICY! Block Legacy Authentication" -BackgroundColor DarkBlue -ForegroundColor White
-Write-Host "This policy blocks Exchange ActiveSync and other legacy clients. Only create if you have confirmed legacy auth usage!" -BackgroundColor DarkYellow -ForegroundColor Black
-Start-Sleep -Seconds 1
+Write-Host "Auto- Block Legacy Authentication" -BackgroundColor DarkBlue -ForegroundColor White
+
 
 $policyName = "Block Legacy Auth"
 
@@ -436,15 +579,19 @@ $params = @{
 }
 
 # Check if the policy already exists
-$existingPolicy = Get-MgIdentityConditionalAccessPolicy | Where-Object { $_.DisplayName -eq $policyName }
+$existingPolicy = $ExistingCAPolicies | Where-Object { $_.DisplayName -eq $policyName }
 
 if ($null -ne $existingPolicy) {
     Write-Host "Conditional Access Policy '$policyName' already exists. Skipping creation." -BackgroundColor DarkBlue -ForegroundColor White
-    Start-Sleep -Seconds 1
 } else {
-    New-MgIdentityConditionalAccessPolicy -BodyParameter $params
-    Write-Host "Conditional Access Policy '$policyName' created successfully." -BackgroundColor DarkBlue -ForegroundColor White
-    Start-Sleep -Seconds 1
+    try {
+        New-MgIdentityConditionalAccessPolicy -BodyParameter $params -ErrorAction Stop | Out-Null
+        Write-Host "Conditional Access Policy '$policyName' created successfully." -BackgroundColor DarkBlue -ForegroundColor White
+        Refresh-ConditionalAccessPolicyCache
+    }
+    catch {
+        Write-Host "ERROR: Failed to create Conditional Access Policy '$policyName': $($_.Exception.Message)" -BackgroundColor DarkRed -ForegroundColor White
+    }
 }
 
 ##########!##################################################################
@@ -453,8 +600,15 @@ if ($null -ne $existingPolicy) {
 ############!################################################################
 #############!###############################################################
 Write-Host "POLICY - BLOCK BAD IPs" -BackgroundColor DarkBlue -ForegroundColor White
-Write-Host "Getting Bad IP Lists (VPN + TOR)" -BackgroundColor DarkBlue -ForegroundColor White
-Start-Sleep -Seconds 2
+$existingBadRepPolicy = $ExistingCAPolicies |
+    Where-Object { $_.DisplayName -eq "BadRep IP Block" }
+
+if ($null -ne $existingBadRepPolicy) {
+    Write-Host "Conditional Access Policy 'BadRep IP Block' already exists - skipping BadRep location and policy creation." -BackgroundColor DarkBlue -ForegroundColor White
+}
+else {
+    Write-Host "Conditional Access Policy 'BadRep IP Block' not found. Continuing..." -BackgroundColor DarkGreen -ForegroundColor White
+    Write-Host "Getting Bad IP Lists (VPN + TOR)" -BackgroundColor DarkBlue -ForegroundColor White
 
 # -----------------------------------------------------------------------------
 # 1. Download and prepare source lists
@@ -500,9 +654,10 @@ function New-ChunkedNamedLocation {
         return @()
     }
 
-    $chunks = @()
-    for ($i = 0; $i -lt $allIPs.Count; $i += $ChunkSize) {
-        $chunks += ,($allIPs[$i..([Math]::Min($i + $ChunkSize - 1, $allIPs.Count - 1))])
+    $chunks = foreach ($i in 0..([Math]::Floor(($allIPs.Count - 1) / $ChunkSize))) {
+        $start = $i * $ChunkSize
+        $end = [Math]::Min($start + $ChunkSize - 1, $allIPs.Count - 1)
+        ,($allIPs[$start..$end])
     }
 
     $createdIds = @()
@@ -510,48 +665,64 @@ function New-ChunkedNamedLocation {
     foreach ($chunk in $chunks) {
         $chunkName = "$DisplayName-Part$part"
 
-        $existing = Get-MgIdentityConditionalAccessNamedLocation | Where-Object { $_.DisplayName -eq $chunkName }
+        $existing = Get-MgIdentityConditionalAccessNamedLocation -All |
+            Where-Object { $_.DisplayName -eq $chunkName } |
+            Select-Object -First 1
         if ($null -ne $existing) {
-            Write-Host ("Named location '{0}' already exists - skipping." -f $chunkName) -BackgroundColor DarkBlue -ForegroundColor White
-            $createdIds += $existing.Id
-            $part++
-            continue
-        }
-
-        $ipArray = @()
-        foreach ($ip in $chunk) {
-            $ipArray += @{
-                "@odata.type" = "#microsoft.graph.iPv4CidrRange"
-                CidrAddress   = $ip
+            # Verify the location is still valid
+            try {
+                Get-MgIdentityConditionalAccessNamedLocation -NamedLocationId $existing.Id -ErrorAction Stop | Out-Null
+                Write-Host ("Named location '{0}' already exists and is valid - skipping." -f $chunkName) -BackgroundColor DarkBlue -ForegroundColor White
+                $createdIds += $existing.Id
+                $part++
+                continue
+            }
+            catch {
+                Write-Host ("WARNING: Named location '{0}' exists but is invalid. Recreating..." -f $chunkName) -BackgroundColor DarkYellow -ForegroundColor Black
+                $existing = $null
             }
         }
 
-        $params = @{
-            "@odata.type" = "#microsoft.graph.ipNamedLocation"
-            DisplayName   = $chunkName
-            IsTrusted     = $false
-            IpRanges      = $ipArray
-        }
-
-        try {
-            $created = New-MgIdentityConditionalAccessNamedLocation -BodyParameter $params
-            $countText = "$($chunk.Count) IPs"
-            Write-Host ("Created named location '{0}' ({1}) with ID: {2}" -f $chunkName, $countText, $created.Id) -BackgroundColor DarkGreen -ForegroundColor White
-            
-            # Verify the ID is not empty
-            if (-not [string]::IsNullOrWhiteSpace($created.Id)) {
-                $createdIds += $created.Id
+        if ($null -eq $existing) {
+            $ipArray = foreach ($ip in $chunk) {
+                @{
+                    "@odata.type" = "#microsoft.graph.iPv4CidrRange"
+                    CidrAddress   = $ip
+                }
             }
-            else {
-                Write-Host ("WARNING: Created location '{0}' but ID is empty!" -f $chunkName) -BackgroundColor DarkYellow -ForegroundColor Black
-            }
-        }
-        catch {
-            Write-Host ("Failed to create '{0}': {1}" -f $chunkName, $_.Exception.Message) -BackgroundColor DarkRed -ForegroundColor White
-        }
 
+            $params = @{
+                "@odata.type" = "#microsoft.graph.ipNamedLocation"
+                DisplayName   = $chunkName
+                IsTrusted     = $false
+                IpRanges      = $ipArray
+            }
+
+            try {
+                $created = New-MgIdentityConditionalAccessNamedLocation -BodyParameter $params -ErrorAction Stop
+                $countText = "$($chunk.Count) IPs"
+                Write-Host ("Created named location '{0}' ({1}) with ID: {2}" -f $chunkName, $countText, $created.Id) -BackgroundColor DarkGreen -ForegroundColor White
+                
+                # Verify the ID is not empty
+                if (-not [string]::IsNullOrWhiteSpace($created.Id)) {
+                    if (Wait-NamedLocationAvailable -NamedLocationId $created.Id) {
+                        $createdIds += $created.Id
+                    }
+                    else {
+                        Write-Host ("WARNING: Created location '{0}', but Graph is not returning it yet. It will be excluded from this run." -f $chunkName) -BackgroundColor DarkYellow -ForegroundColor Black
+                    }
+                }
+                else {
+                    Write-Host ("WARNING: Created location '{0}' but ID is empty!" -f $chunkName) -BackgroundColor DarkYellow -ForegroundColor Black
+                }
+            }
+            catch {
+                Write-Host ("Failed to create '{0}': {1}" -f $chunkName, $_.Exception.Message) -BackgroundColor DarkRed -ForegroundColor White
+            }
+
+        }
+        
         $part++
-        Start-Sleep -Seconds 2
     }
 
     return $createdIds
@@ -561,11 +732,10 @@ function New-ChunkedNamedLocation {
 # 3. Create named locations for each list
 # -----------------------------------------------------------------------------
 $BadRep1_Locations = New-ChunkedNamedLocation -DisplayName "BadRep1" -FilePath $tempVpn
-$BadRep2_Locations = New-ChunkedNamedLocation -DisplayName "BadRep2" -FilePath $tempVpn
 $BadRep3_Locations = New-ChunkedNamedLocation -DisplayName "BadRep3" -FilePath $tempTor
 
 # Clean up temporary files
-Remove-Item -Path (Join-Path $outputDir "*.txt") -Force -ErrorAction SilentlyContinue
+Remove-Item -Path $tempVpn, $tempTor -Force -ErrorAction SilentlyContinue
 
 # -----------------------------------------------------------------------------
 # 4. Create the Conditional Access Policy
@@ -575,7 +745,6 @@ Write-Host "Creating BadRep IP Block Conditional Access Policy..." -BackgroundCo
 # Combine all IDs and filter out any empty/null values
 $AllBadRepIDs = @()
 $AllBadRepIDs += $BadRep1_Locations | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-$AllBadRepIDs += $BadRep2_Locations | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 $AllBadRepIDs += $BadRep3_Locations | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
 Write-Host "Total valid named location IDs collected: $($AllBadRepIDs.Count)" -BackgroundColor DarkBlue -ForegroundColor White
@@ -584,58 +753,65 @@ if ($AllBadRepIDs.Count -eq 0) {
     Write-Host "No BadRep named locations found - skipping policy creation." -BackgroundColor DarkYellow -ForegroundColor Black
 }
 else {
-    $AdminRolesIds = Get-MgRoleManagementDirectoryRoleDefinition |
-        Where-Object { $_.DisplayName -like '*Global Administrator*' } |
-        Select-Object -ExpandProperty Id
-
-    $repblockparams = @{
-        displayName = "BadRep IP Block"
-        state       = "enabled"
-        conditions  = @{
-            applications = @{
-                includeApplications = @("All")
-            }
-            users = @{
-                includeUsers  = @("all")
-                excludeRoles  = $AdminRolesIds
-            }
-            locations = @{
-                includeLocations = $AllBadRepIDs
-            }
+    # Verify all collected IDs are still valid before creating policy
+    Write-Host "Verifying all named location IDs are valid..." -BackgroundColor DarkBlue -ForegroundColor White
+    $validIDs = @()
+    foreach ($id in $AllBadRepIDs) {
+        if (Wait-NamedLocationAvailable -NamedLocationId $id) {
+            $validIDs += $id
         }
-        grantControls = @{
-            operator        = "OR"
-            builtInControls = @("block")
+        else {
+            Write-Host "WARNING: Named location ID $id is invalid and will be excluded from policy." -BackgroundColor DarkYellow -ForegroundColor Black
         }
     }
-
-    $existingPolicy = Get-MgIdentityConditionalAccessPolicy |
-        Where-Object { $_.DisplayName -eq "BadRep IP Block" }
-
-    if ($null -ne $existingPolicy) {
-        Write-Host "Conditional Access Policy 'BadRep IP Block' already exists - skipping." -BackgroundColor DarkBlue -ForegroundColor White
+    
+    Write-Host "Verified $($validIDs.Count) valid named location IDs." -BackgroundColor DarkGreen -ForegroundColor White
+    
+    if ($validIDs.Count -eq 0) {
+        Write-Host "No valid named location IDs found - skipping policy creation." -BackgroundColor DarkYellow -ForegroundColor Black
     }
     else {
+        $repblockparams = @{
+            displayName = "BadRep IP Block"
+            state       = "enabled"
+            conditions  = @{
+                applications = @{
+                    includeApplications = @("All")
+                }
+                users = @{
+                    includeUsers  = @("all")
+                    excludeRoles  = $GlobalAdminRoleIds
+                }
+                locations = @{
+                    includeLocations = $validIDs
+                }
+            }
+            grantControls = @{
+                operator        = "OR"
+                builtInControls = @("block")
+            }
+        }
+
         try {
-            New-MgIdentityConditionalAccessPolicy -BodyParameter $repblockparams
+            New-MgIdentityConditionalAccessPolicy -BodyParameter $repblockparams -ErrorAction Stop | Out-Null
             Write-Host "Conditional Access Policy 'BadRep IP Block' created successfully." -BackgroundColor DarkGreen -ForegroundColor White
+            Refresh-ConditionalAccessPolicyCache
         }
         catch {
             Write-Host "Failed to create 'BadRep IP Block' policy: $($_.Exception.Message)" -BackgroundColor DarkRed -ForegroundColor White
         }
     }
 }
-
+}
 ##############################!###################################################################################################
 ##############################!###################################################################################################
 ###########################!#########Create Sign-in Risk Block CAP################################################################
 ############################!#####################################################################################################
 ##############################!###################################################################################################
 Write-Host "Creating Sign-In Risk Block Policy" -BackgroundColor DarkBlue -ForegroundColor White
-Start-Sleep -Seconds 1
 
 # Get Global Administrator role ID
-$AdminRolesIds = Get-MgRoleManagementDirectoryRoleDefinition | Where-Object -FilterScript {$_.DisplayName -like '*Global Administrator'} | Select-Object -ExpandProperty Id
+$AdminRolesIds = $GlobalAdminRoleIds
 
 # Create the Conditional Access Policy
 $conditions = @{
@@ -645,6 +821,10 @@ $conditions = @{
     }
     Applications = @{
         IncludeApplications = @("all")
+    }
+    Locations = @{
+        IncludeLocations = @("All")
+        ExcludeLocations = @("AllTrusted")
     }
     SignInRiskLevels = @("medium", "high")
 }
@@ -656,16 +836,20 @@ $controls = @{
 
 $policyName = "Sign-In Risk Block"
 
-$policyExists = Get-MgIdentityConditionalAccessPolicy | Where-Object { $_.displayName -eq $policyName }
+$policyExists = $ExistingCAPolicies | Where-Object { $_.displayName -eq $policyName }
 
 if ($null -ne $policyExists) {
     Write-Host "Conditional Access Policy 'Sign-In Risk Block' already exists. Skipping creation." -BackgroundColor DarkBlue -ForegroundColor White
-    Start-Sleep -Seconds 1
 } 
 else {
-    New-MgIdentityConditionalAccessPolicy -DisplayName $policyName -State "Enabled" -Conditions $conditions -GrantControls $controls
-    Write-Host "Conditional Access Policy 'Sign-In Risk Block' created successfully." -BackgroundColor DarkBlue -ForegroundColor White
-    Start-Sleep -Seconds 1
+    try {
+        New-MgIdentityConditionalAccessPolicy -DisplayName $policyName -State "Enabled" -Conditions $conditions -GrantControls $controls -ErrorAction Stop | Out-Null
+        Write-Host "Conditional Access Policy 'Sign-In Risk Block' created successfully." -BackgroundColor DarkBlue -ForegroundColor White
+        Refresh-ConditionalAccessPolicyCache
+    }
+    catch {
+        Write-Host "ERROR: Failed to create Conditional Access Policy 'Sign-In Risk Block': $($_.Exception.Message)" -BackgroundColor DarkRed -ForegroundColor White
+    }
 }
 
 #############################!#########################################################
@@ -673,10 +857,9 @@ else {
 ###!###########Show Results#!###########################################################
 ############################!##########################################################
 ##############################!########################################################
-$caps = Get-MgIdentityConditionalAccessPolicy | Select DisplayName, CreatedDateTime, State
+$caps = Get-MgIdentityConditionalAccessPolicy -All | Select DisplayName, CreatedDateTime, State
 Write-Host "The Following Conditional Access Policies Were Created or Already Exist:" -BackgroundColor DarkBlue -ForegroundColor White
-$caps
-Start-Sleep -Seconds 2
+$caps | Format-Table -AutoSize | Out-Host
 Write-Host "Now disconnecting from AzureAD/Graph" -BackgroundColor DarkBlue -ForegroundColor White
 
 #################################!#####################################################
@@ -684,4 +867,4 @@ Write-Host "Now disconnecting from AzureAD/Graph" -BackgroundColor DarkBlue -For
 ##########!######Disconnect###########################################################
 ##################################!####################################################
 ###################################!###################################################
-Disconnect-MgGraph
+Disconnect-MgGraph | Out-Null
